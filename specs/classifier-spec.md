@@ -91,10 +91,10 @@ the format below:" followed by the output format you chose.
 **What output format should you request from the LLM?**
 
 ```
-[blank — you need to parse the response in classify_episode(). What format
-makes parsing reliable? Think about: a single label on its own line?
-A structured format like "Label: X / Reasoning: Y"? JSON?
-What are the tradeoffs?]
+the response should be in JSONL format:
+with each line representing a label and it's reasoning.
+example:
+{"label": "solo", "reason": "One voice, no guest. The host is sharing their own thoughts, analysis, or experience"}
 ```
 
 ---
@@ -102,8 +102,7 @@ What are the tradeoffs?]
 **Edge cases to handle in the prompt:**
 
 ```
-[blank — what if labeled_examples is empty? What if the description is very
-short? How does your prompt handle these?]
+refer to taxonomy.md and follow the classification under How to Handle Ambiguous Cases tag.
 ```
 
 ---
@@ -159,9 +158,15 @@ Extract the response text from:
 **Step 3 — Parse the response:**
 
 ```
-[blank — how do you extract the label and reasoning from the LLM's text output?
-What string operations or parsing logic do you need?
-This depends on the output format you chose in build_few_shot_prompt.]
+The LLM returns a JSON object on a single line:
+  {"label": "solo", "reason": "..."}
+
+1. Strip whitespace from the raw response text.
+2. Try json.loads() on the stripped text.
+3. Extract parsed["label"] and parsed["reason"].
+4. If json.loads() fails, fall back to regex: search for
+   "label"\s*:\s*"(\w+)" to extract just the label, and set
+   reasoning to the full raw text.
 ```
 
 ---
@@ -169,8 +174,13 @@ This depends on the output format you chose in build_few_shot_prompt.]
 **Step 4 — Validate the label:**
 
 ```
-[blank — what do you do if the LLM returns a label that isn't in VALID_LABELS?
-What should label be set to?]
+After extracting the label string:
+1. Normalize to lowercase and strip surrounding whitespace/punctuation.
+2. Check if the normalized label is in VALID_LABELS.
+3. If it is, use it. If it is not, set label = "unknown".
+This handles capitalization variants ("Interview", "INTERVIEW") and
+minor formatting differences without relying on the model to be perfectly
+consistent.
 ```
 
 ---
@@ -178,9 +188,10 @@ What should label be set to?]
 **Step 5 — Handle errors gracefully:**
 
 ```
-[blank — what could go wrong? (Network error? Unparseable response?)
-What should the function return if something fails?
-Hint: the evaluation loop runs 20 calls — one bad response shouldn't crash everything.]
+Wrap the entire function body (Steps 1–4) in a try/except Exception block.
+On any exception (network error, JSON parse failure, missing key, etc.),
+return: {"label": "unknown", "reasoning": "Classification failed: <error message>"}
+This ensures a single bad response never crashes the 20-call evaluation loop.
 ```
 
 ---
