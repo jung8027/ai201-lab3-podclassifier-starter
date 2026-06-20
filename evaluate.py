@@ -33,6 +33,7 @@ def run_evaluation() -> dict:
             "ground_truth": episode["label"],
             "predicted": prediction["label"],
             "reasoning": prediction["reasoning"],
+            "confidence": prediction.get("confidence"),
             "correct": prediction["label"] == episode["label"],
         })
 
@@ -51,14 +52,14 @@ def compute_accuracy(predictions: list[str], ground_truth: list[str]) -> float:
     """
     Compute overall classification accuracy.
 
-    TODO — Milestone 3:
-
     Accuracy = number of correct predictions / total predictions.
     A prediction is correct when it exactly matches the ground truth label.
-
-    Before writing code, complete specs/evaluation-spec.md.
+    Returns 0.0 if both lists are empty.
     """
-    return 0.0
+    if not predictions:
+        return 0.0
+    correct = sum(p == t for p, t in zip(predictions, ground_truth))
+    return correct / len(predictions)
 
 
 def compute_per_class_accuracy(
@@ -67,23 +68,27 @@ def compute_per_class_accuracy(
     """
     Compute accuracy broken down by each label class.
 
-    TODO — Milestone 3 (complete after compute_accuracy):
-
-    For each label in VALID_LABELS, compute:
-      - "correct"  : number of episodes with this ground-truth label predicted correctly
-      - "total"    : number of episodes with this ground-truth label
+    For each label in VALID_LABELS, computes:
+      - "correct"  : episodes with that ground-truth label predicted correctly
+      - "total"    : episodes with that ground-truth label
       - "accuracy" : correct / total (0.0 if total is 0)
-
-    Return a dict keyed by label. Example:
-      {
-        "interview": {"correct": 4, "total": 5, "accuracy": 0.8},
-        "solo":      {"correct": 5, "total": 5, "accuracy": 1.0},
-        ...
-      }
-
-    Before writing code, complete specs/evaluation-spec.md.
     """
-    return {label: {"correct": 0, "total": 0, "accuracy": 0.0} for label in VALID_LABELS}
+    counts = {label: {"correct": 0, "total": 0} for label in VALID_LABELS}
+
+    for predicted, truth in zip(predictions, ground_truth):
+        if truth in counts:
+            counts[truth]["total"] += 1
+            if predicted == truth:
+                counts[truth]["correct"] += 1
+
+    return {
+        label: {
+            **counts[label],
+            "accuracy": counts[label]["correct"] / counts[label]["total"]
+            if counts[label]["total"] > 0 else 0.0,
+        }
+        for label in VALID_LABELS
+    }
 
 
 def format_evaluation_report(eval_results: dict) -> str:
@@ -106,7 +111,9 @@ def format_evaluation_report(eval_results: dict) -> str:
     ]
     for label, stats in per_class.items():
         bar = "█" * int(stats["accuracy"] * 10) + "░" * (10 - int(stats["accuracy"] * 10))
-        lines.append(f"  {label:<12} {bar}  {stats['accuracy']:.0%}  ({stats['correct']}/{stats['total']})")
+        class_confs = [r["confidence"] for r in results if r["ground_truth"] == label and r.get("confidence") is not None]
+        conf_str = f"  conf={sum(class_confs)/len(class_confs):.1f}/10" if class_confs else ""
+        lines.append(f"  {label:<12} {bar}  {stats['accuracy']:.0%}  ({stats['correct']}/{stats['total']}){conf_str}")
 
     misclassified = [r for r in results if not r["correct"]]
     if misclassified:

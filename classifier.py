@@ -55,8 +55,9 @@ def build_few_shot_prompt(labeled_examples: list[dict], description: str) -> str
         "- narrative: a story assembled from external sources — interviews, archival "
         "audio, reporting — with a clear narrative arc",
         "",
-        "Return your answer as a single JSON object on one line with keys \"label\" and "
-        "\"reason\". Example: {\"label\": \"solo\", \"reason\": \"One voice, no guest.\"}",
+        "Return your answer as a single JSON object on one line with keys \"label\", "
+        "\"reason\", and \"confidence\" (integer 0–10, where 10 means completely certain). "
+        "Example: {\"label\": \"solo\", \"reason\": \"One voice, no guest.\", \"confidence\": 9}",
         "Do not include any text outside the JSON object.",
         "",
         "--- EXAMPLES ---",
@@ -95,10 +96,14 @@ def classify_episode(description: str, labeled_examples: list[dict]) -> dict:
         response_text = response.choices[0].message.content.strip()
 
         # Parse JSON response; fall back to regex on failure
+        confidence = None
         try:
             parsed = json.loads(response_text)
             raw_label = parsed.get("label", "")
             reasoning = parsed.get("reason", response_text)
+            raw_conf = parsed.get("confidence")
+            if isinstance(raw_conf, (int, float)):
+                confidence = max(0, min(10, int(raw_conf)))
         except json.JSONDecodeError:
             match = re.search(r'"label"\s*:\s*"(\w+)"', response_text)
             raw_label = match.group(1) if match else ""
@@ -108,7 +113,7 @@ def classify_episode(description: str, labeled_examples: list[dict]) -> dict:
         if label not in VALID_LABELS:
             label = "unknown"
 
-        return {"label": label, "reasoning": reasoning}
+        return {"label": label, "reasoning": reasoning, "confidence": confidence}
 
     except Exception as e:
-        return {"label": "unknown", "reasoning": f"Classification failed: {e}"}
+        return {"label": "unknown", "reasoning": f"Classification failed: {e}", "confidence": None}
