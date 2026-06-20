@@ -183,17 +183,3 @@ Trace:
   i=3: truth=panel,     pred=panel     → panel correct++ total++
   i=4: truth=narrative, pred=panel     → narrative total++
 ```
-
----
-
-## Reflection questions (discuss at the checkpoint)
-
-1. Your overall accuracy might be decent even if one class has very low accuracy.
-   Why is per-class accuracy a more informative metric than overall accuracy alone?
-
-2. If `panel` episodes consistently get misclassified as `interview`, what does
-   that tell you about your training labels or your prompt?
-
-3. You labeled 20 training episodes and evaluated on 20 test episodes (5 per class).
-   How might the evaluation results change if you had labeled 100 training episodes?
-   What if you had 200 test episodes?
